@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Control Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --background-color: #f8f9fa;
+            --card-background: white;
+            --text-color: #202124;
+            --secondary-text-color: #5f6368;
+            --border-color: #dadce0;
+            --console-background: #1e1e1e;
+            --console-text: #e0e0e0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .dashboard {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .dashboard-title {
+            font-size: 24px;
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        .status-section {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .status-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 15px;
+        }
+
+        .status-running {
+            background-color: #34a853;
+        }
+
+        .status-stopped {
+            background-color: #ea4335;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-start {
+            background-color: #34a853;
+            color: white;
+        }
+
+        .btn-stop {
+            background-color: #ea4335;
+            color: white;
+        }
+
+        .btn-logout {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .bot-info {
+            background-color: #f1f3f4;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            color: var(--secondary-text-color);
+        }
+
+        .console {
+            background-color: var(--console-background);
+            color: var(--console-text);
+            font-family: 'Courier New', monospace;
+            height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .console-log {
+            margin-bottom: 5px;
+        }
+
+        .console-log.stdout {
+            color: #4CAF50;
+        }
+
+        .console-log.stderr {
+            color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="card">
+            <div class="dashboard-header">
+                <h1 class="dashboard-title">Bot Control Panel</h1>
+                <a href="/logout" class="btn btn-logout">Logout</a>
+            </div>
+
+            <div class="status-section">
+                <div id="status-indicator" class="status-indicator"></div>
+                <h2>Bot Status: <span id="bot-status">Loading...</span></h2>
+            </div>
+
+            <div class="control-buttons">
+                <button id="start-btn" class="btn btn-start">Start Bot</button>
+                <button id="stop-btn" class="btn btn-stop">Stop Bot</button>
+            </div>
+
+            <div class="bot-info">
+                <div class="info-item">
+                    <span>Uptime</span>
+                    <span id="bot-uptime">N/A</span>
+                </div>
+                <div class="info-item">
+                    <span>Last Started</span>
+                    <span id="last-started">Never</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="dashboard-title">Console Logs</h2>
+            <div id="console" class="console">
+                No logs available
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const statusIndicator = document.getElementById('status-indicator');
+            const botStatusText = document.getElementById('bot-status');
+            const botUptime = document.getElementById('bot-uptime');
+            const lastStarted = document.getElementById('last-started');
+            const consoleElement = document.getElementById('console');
+
+            // Uptime tracking variables
+            let botStartTime = null;
+            let uptimeInterval = null;
+
+            // Format time with leading zeros
+            function padZero(num) {
+                return num.toString().padStart(2, '0');
+            }
+
+            // Calculate and update uptime
+            function updateUptime() {
+                if (!botStartTime) return;
+
+                const currentTime = Math.floor(Date.now() / 1000);
+                const uptimeSeconds = currentTime - botStartTime;
+                
+                const hours = Math.floor(uptimeSeconds / 3600);
+                const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+                const seconds = uptimeSeconds % 60;
+
+                botUptime.textContent = `${padZero(hours)}h ${padZero(minutes)}m ${padZero(seconds)}s`;
+            }
+
+            // Update UI based on bot status
+            function updateBotStatusUI(data) {
+                // Update status indicator
+                statusIndicator.classList.remove('status-running', 'status-stopped');
+                statusIndicator.classList.add(data.status === 'Running' ? 'status-running' : 'status-stopped');
+
+                // Update status text
+                botStatusText.textContent = data.status;
+
+                // Update last started
+                lastStarted.textContent = data.last_started || 'Never';
+
+                // Update logs
+                updateConsoleLogs(data.logs);
+
+                // Handle uptime
+                if (data.status === 'Running' && data.last_started) {
+                    // Convert last started to timestamp
+                    botStartTime = Math.floor(new Date(data.last_started).getTime() / 1000);
+                    
+                    // Clear any existing interval
+                    if (uptimeInterval) {
+                        clearInterval(uptimeInterval);
+                    }
+                    
+                    // Start new uptime tracking
+                    uptimeInterval = setInterval(updateUptime, 1000);
+                    updateUptime();
+                } else {
+                    // Stop uptime tracking
+                    if (uptimeInterval) {
+                        clearInterval(uptimeInterval);
+                    }
+                    botUptime.textContent = 'N/A';
+                    botStartTime = null;
+                }
+            }
+
+            // Update console logs
+            function updateConsoleLogs(logs) {
+                if (!logs || logs.length === 0) {
+                    consoleElement.innerHTML = 'No logs available';
+                    return;
+                }
+
+                // Clear previous logs and add new ones
+                consoleElement.innerHTML = logs.map(log => {
+                    const logClass = log.includes('STDOUT:') ? 'stdout' : 'stderr';
+                    return `<div class="console-log ${logClass}">${log}</div>`;
+                }).join('');
+
+                // Auto-scroll to bottom
+                consoleElement.scrollTop = consoleElement.scrollHeight;
+            }
+
+            // Listen for bot status updates
+            socket.on('bot_status_update', updateBotStatusUI);
+
+            // Listen for log updates
+            socket.on('bot_logs_update', (data) => {
+                updateConsoleLogs(data.logs);
+            });
+
+            // Request initial status and logs on connect
+            socket.on('connect', () => {
+                socket.emit('request_status');
+                socket.emit('request_logs');
+            });
+
+            // Start bot
+            startBtn.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/start_bot', { method: 'POST' });
+                    const data = await response.json();
+                    alert(data.message);
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('An error occurred while starting the bot');
+                }
+            });
+
+            // Stop bot
+            stopBtn.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/stop_bot', { method: 'POST' });
+                    const data = await response.json();
+                    alert(data.message);
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('An error occurred while stopping the bot');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,3 +1,21 @@
-g4f
+# Telegram Bot Dependencies
 pyTelegramBotAPI==4.14.0
-googletrans==3.1.0a0
+g4f==0.1.9.2
+requests==2.31.0
+
+# Web Panel Dependencies
+flask==2.3.2
+flask-socketio==5.3.4
+python-engineio==4.4.1
+python-socketio==5.8.0
+
+# System and Process Management
+psutil==5.9.5
+
+# Optional: For development and debugging
+pytest==7.4.2
+black==23.7.0
+flake8==6.0.0
+
+# Optional: For internationalization
+babel==2.12.1

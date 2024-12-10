@@ -1,340 +1,214 @@
-import json
 import telebot
-from telebot import types
 import g4f
 import requests
-import datetime
+import logging
+from telebot import types
+import json
+import os
 
-from config import token, serverprompt
-from user_profile import ProfileManager
-from translations import get_text, LANGUAGE_NAMES
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-AVAILABLE_MODELS = [
-    'mixtral-8x7b',
-    'gemini-pro',
-    'gpt-4'
-]
-
-MODEL_DISPLAY_NAMES = {
-    'mixtral-8x7b': 'moonlight-pro',
-    'gemini-pro': 'moonlight',
-    'gpt-4': 'gpt-4'
+# Text Generation Models
+TEXT_MODELS = {
+    'mixtral': g4f.models.Mixtral,
+    'gpt-3.5-turbo': g4f.models.GPT_35_TURBO,
+    'claude-v2': g4f.models.Claude_V2,
+    'llama-2': g4f.models.Llama2,
+    'zephyr': g4f.models.Zephyr
 }
 
+# Image Generation Models
+IMAGE_MODELS = {
+    'flux-pro': 'https://flux-pro-api.com/generate',  # Placeholder, replace with actual API
+    'stable-diffusion': 'https://stable-diffusion-api.com/generate',
+    'midjourney': 'https://midjourney-api.com/generate',
+    'dalle-3': 'https://openai-api.com/dalle3/generate'
+}
+
+# Load bot token from config
+from config import token
+
+# Initialize bot
 bot = telebot.TeleBot(token)
 
-def translate_text(text, target_lang='ru'):
-    try:
-        # Используем Google Translate API
-        url = "https://translate.googleapis.com/translate_a/single"
-        params = {
-            "client": "gtx",
-            "sl": "auto",
-            "tl": target_lang,
-            "dt": "t",
-            "q": text
-        }
-        response = requests.get(url, params=params)
-        translation = response.json()[0][0][0]
-        return translation
-    except Exception as e:
-        print(f"Ошибка перевода: {e}")
-        return text
+# User state tracking
+user_states = {}
 
-def get_ai_response(message, profile, model_name='gpt-4', language='ru'):
+def detect_intent(message):
+    """
+    Use Mixtral to detect user's intent (text or image generation)
+    """
     try:
-        # Получаем всю историю сообщений пользователя
-        history = profile.data.get('history', [])
+        intent_prompt = f"""
+        Analyze the following user message and determine its intent:
+        Message: {message}
         
-        # Формируем список сообщений с учетом истории
-        messages = [{"role": "system", "content": serverprompt}]
+        Respond ONLY with one of these exact keywords:
+        - TEXT: If the user wants text generation
+        - IMAGE: If the user wants image generation
+        - UNKNOWN: If the intent is unclear
+        """
         
-        # Добавляем все сообщения из истории
-        for hist_item in history:
-            messages.append({"role": "user", "content": hist_item['message']})
-            messages.append({"role": "assistant", "content": hist_item['response']})
+        intent = g4f.ChatCompletion.create(
+            model=g4f.models.Mixtral,
+            messages=[{"role": "user", "content": intent_prompt}],
+            stream=False
+        )
         
-        # Добавляем текущее сообщение пользователя
-        messages.append({"role": "user", "content": message})
-        
-        # Ограничиваем количество токенов, чтобы не превысить лимит модели
-        max_tokens = 4000  # Примерное ограничение для большинства моделей
-        total_tokens = sum(len(msg['content'].split()) for msg in messages)
-        
-        # Если превышаем лимит, урезаем историю
-        while total_tokens > max_tokens and len(messages) > 2:
-            messages.pop(1)  # Удаляем старые сообщения, оставляя системный промпт
-            total_tokens = sum(len(msg['content'].split()) for msg in messages)
+        # Clean and validate intent
+        intent = intent.strip().upper()
+        return intent if intent in ['TEXT', 'IMAGE', 'UNKNOWN'] else 'UNKNOWN'
+    
+    except Exception as e:
+        logger.error(f"Intent detection error: {e}")
+        return 'UNKNOWN'
+
+def generate_text(message, model_name='mixtral'):
+    """
+    Generate text using selected model
+    """
+    try:
+        model = TEXT_MODELS.get(model_name, g4f.models.Mixtral)
         
         response = g4f.ChatCompletion.create(
-            model=model_name,
-            messages=messages,
-            stream=False,
+            model=model,
+            messages=[{"role": "user", "content": message}],
+            stream=False
         )
-        answer = response
         
-        if language != 'en':
-            answer = translate_text(answer, language)
-        
-        return answer
+        return response
+    
     except Exception as e:
-        return f"Ошибка генерации ответа: {e}"
+        logger.error(f"Text generation error with {model_name}: {e}")
+        return "Sorry, I couldn't generate a response."
 
-def create_main_menu(lang_code):
-    keyboard = types.InlineKeyboardMarkup()
-    keyboard.row(
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_select_model'), callback_data='show_models'),
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_profile'), callback_data='show_profile')
-    )
-    keyboard.row(
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_language'), callback_data='show_languages')
-    )
-    return keyboard
-
-def create_models_menu(lang_code):
-    keyboard = types.InlineKeyboardMarkup()
-    for model_name in AVAILABLE_MODELS:
-        keyboard.row(
-            types.InlineKeyboardButton(
-                MODEL_DISPLAY_NAMES[model_name], 
-                callback_data=f'select_model_{model_name}'
-            )
-        )
-    keyboard.row(
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_back'), callback_data='main_menu')
-    )
-    return keyboard
-
-def create_languages_menu(lang_code):
-    keyboard = types.InlineKeyboardMarkup()
-    languages = ['ru', 'en', 'es', 'de', 'fr']
-    for lang in languages:
-        keyboard.row(
-            types.InlineKeyboardButton(
-                f"{LANGUAGE_NAMES[lang]} {LANGUAGE_NAMES[lang][0]}", 
-                callback_data=f'select_language_{lang}'
-            )
-        )
-    keyboard.row(
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_back'), callback_data='main_menu')
-    )
-    return keyboard
-
-def create_modify_response_menu(lang_code):
-    keyboard = types.InlineKeyboardMarkup()
-    keyboard.row(
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_shorter'), callback_data='modify_shorter'),
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_longer'), callback_data='modify_longer')
-    )
-    keyboard.row(
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_simpler'), callback_data='modify_simpler'),
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_complex'), callback_data='modify_complex')
-    )
-    keyboard.row(
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_back'), callback_data='main_menu')
-    )
-    return keyboard
-
-def handle_start(message):
-    profile = ProfileManager(message.from_user.id)
+def generate_image(message, model_name='flux-pro'):
+    """
+    Generate image using selected model
+    """
+    try:
+        # Placeholder for image generation logic
+        # In a real implementation, you'd use specific API calls
+        if model_name == 'flux-pro':
+            # Example API call (replace with actual implementation)
+            response = requests.post('https://flux-pro-api.com/generate', 
+                                     json={'prompt': message, 'model': 'default'})
+            if response.status_code == 200:
+                return response.json().get('image_url')
+        
+        return "Image generation not fully implemented"
     
-    if not profile.data.get('settings', {}).get('language'):
-        bot.send_message(
-            message.chat.id, 
-            get_text('ru', 'select_language'), 
-            reply_markup=create_languages_menu('ru')
-        )
-        return
+    except Exception as e:
+        logger.error(f"Image generation error with {model_name}: {e}")
+        return "Sorry, I couldn't generate an image."
 
-    lang_code = profile.data['settings'].get('language', 'ru')
-    welcome_text = (
-        f"{get_text(lang_code, 'welcome')}\n\n"
-        f"{get_text(lang_code, 'registration_key').format(profile.get_registration_key())}\n"
-        f"{get_text(lang_code, 'current_model').format(MODEL_DISPLAY_NAMES[profile.data['settings'].get('model', 'gpt-4')])}\n"
-        f"{get_text(lang_code, 'current_language').format(LANGUAGE_NAMES[lang_code])}\n\n"
-        f"{get_text(lang_code, 'menu_hint')}"
-    )
+def create_model_keyboard(model_type):
+    """
+    Create inline keyboard for model selection
+    """
+    markup = types.InlineKeyboardMarkup()
     
-    bot.send_message(
-        message.chat.id, 
-        welcome_text, 
-        reply_markup=create_main_menu(lang_code)
-    )
+    if model_type == 'text':
+        for model in TEXT_MODELS.keys():
+            markup.add(types.InlineKeyboardButton(model.upper(), callback_data=f'text_model_{model}'))
+    
+    elif model_type == 'image':
+        for model in IMAGE_MODELS.keys():
+            markup.add(types.InlineKeyboardButton(model.upper(), callback_data=f'image_model_{model}'))
+    
+    return markup
 
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    """
+    Welcome message and initial instructions
+    """
+    welcome_text = """
+    🤖 Welcome to the Multi-AI Bot! 
+    
+    I can help you with:
+    - Text Generation
+    - Image Generation
+    
+    Just send me a message, and I'll help you choose the right AI model!
+    """
+    bot.reply_to(message, welcome_text)
+
+@bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    profile = ProfileManager(message.from_user.id)
-    lang_code = profile.data['settings'].get('language', 'ru')
+    """
+    Main message handler
+    """
+    try:
+        intent = detect_intent(message.text)
+        
+        if intent == 'TEXT':
+            # Prompt for text model selection
+            bot.reply_to(message, 
+                         "Choose a text generation model:", 
+                         reply_markup=create_model_keyboard('text'))
+            user_states[message.from_user.id] = {'intent': 'text', 'message': message.text}
+        
+        elif intent == 'IMAGE':
+            # Prompt for image model selection
+            bot.reply_to(message, 
+                         "Choose an image generation model:", 
+                         reply_markup=create_model_keyboard('image'))
+            user_states[message.from_user.id] = {'intent': 'image', 'message': message.text}
+        
+        else:
+            bot.reply_to(message, "I'm not sure what you want. Try being more specific about text or image generation.")
     
-    if not profile.data.get('settings', {}).get('language'):
-        bot.send_message(
-            message.chat.id, 
-            get_text('ru', 'select_language'), 
-            reply_markup=create_languages_menu('ru')
-        )
-        return
+    except Exception as e:
+        logger.error(f"Message handling error: {e}")
+        bot.reply_to(message, "Sorry, something went wrong. Please try again.")
 
-    profile.data['last_message'] = message.text
+@bot.callback_query_handler(func=lambda call: True)
+def callback_query(call):
+    """
+    Handle model selection callbacks
+    """
+    try:
+        user_id = call.from_user.id
+        
+        if user_id not in user_states:
+            bot.answer_callback_query(call.id, "Session expired. Please start over.")
+            return
+        
+        user_state = user_states[user_id]
+        
+        if call.data.startswith('text_model_'):
+            model = call.data.split('_')[-1]
+            response = generate_text(user_state['message'], model)
+            bot.send_message(user_id, response)
+        
+        elif call.data.startswith('image_model_'):
+            model = call.data.split('_')[-1]
+            response = generate_image(user_state['message'], model)
+            
+            # Send image or error message
+            if response.startswith('http'):
+                bot.send_photo(user_id, response)
+            else:
+                bot.send_message(user_id, response)
+        
+        # Clear user state after processing
+        del user_states[user_id]
+        
+        bot.answer_callback_query(call.id)
     
-    answer = get_ai_response(
-        message.text, 
-        profile, 
-        profile.data['settings'].get('model', 'gpt-4'), 
-        lang_code
-    )
-    
-    profile.add_to_history(message.text, answer)
-    
-    response_keyboard = types.InlineKeyboardMarkup()
-    response_keyboard.row(
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_regenerate'), callback_data='regenerate_response'),
-        types.InlineKeyboardButton(get_text(lang_code, 'btn_modify'), callback_data='modify_response')
-    )
-    
-    bot.send_message(
-        message.chat.id, 
-        answer, 
-        reply_markup=response_keyboard
-    )
+    except Exception as e:
+        logger.error(f"Callback query error: {e}")
+        bot.answer_callback_query(call.id, "An error occurred.")
 
-def handle_callback(call):
-    profile = ProfileManager(call.from_user.id)
-    lang_code = profile.data['settings'].get('language', 'ru')
+def main():
+    """
+    Main bot polling
+    """
+    logger.info("Bot is running...")
+    bot.polling(none_stop=True)
 
-    if call.data == 'main_menu':
-        bot.edit_message_text(
-            get_text(lang_code, 'menu_hint'), 
-            call.message.chat.id, 
-            call.message.message_id, 
-            reply_markup=create_main_menu(lang_code)
-        )
-    elif call.data == 'show_models':
-        bot.edit_message_text(
-            get_text(lang_code, 'select_model'), 
-            call.message.chat.id, 
-            call.message.message_id, 
-            reply_markup=create_models_menu(lang_code)
-        )
-    elif call.data.startswith('select_model_'):
-        model_name = call.data.split('_')[-1]
-        profile.data['settings']['model'] = model_name
-        profile.save()
-        
-        bot.answer_callback_query(call.id, get_text(lang_code, 'model_changed').format(MODEL_DISPLAY_NAMES[model_name]))
-        
-        welcome_text = (
-            f"{get_text(lang_code, 'welcome')}\n\n"
-            f"{get_text(lang_code, 'registration_key').format(profile.get_registration_key())}\n"
-            f"{get_text(lang_code, 'current_model').format(MODEL_DISPLAY_NAMES[profile.data['settings'].get('model', 'gpt-4')])}\n"
-            f"{get_text(lang_code, 'current_language').format(LANGUAGE_NAMES[lang_code])}\n\n"
-            f"{get_text(lang_code, 'menu_hint')}"
-        )
-        
-        bot.edit_message_text(
-            welcome_text, 
-            call.message.chat.id, 
-            call.message.message_id, 
-            reply_markup=create_main_menu(lang_code)
-        )
-    elif call.data == 'show_languages':
-        bot.edit_message_text(
-            get_text(lang_code, 'select_language'), 
-            call.message.chat.id, 
-            call.message.message_id, 
-            reply_markup=create_languages_menu(lang_code)
-        )
-    elif call.data.startswith('select_language_'):
-        new_lang = call.data.split('_')[-1]
-        profile.data['settings']['language'] = new_lang
-        profile.save()
-        
-        bot.answer_callback_query(call.id, get_text(new_lang, 'language_changed').format(LANGUAGE_NAMES[new_lang]))
-        
-        welcome_text = (
-            f"{get_text(new_lang, 'welcome')}\n\n"
-            f"{get_text(new_lang, 'registration_key').format(profile.get_registration_key())}\n"
-            f"{get_text(new_lang, 'current_model').format(MODEL_DISPLAY_NAMES[profile.data['settings'].get('model', 'gpt-4')])}\n"
-            f"{get_text(new_lang, 'current_language').format(LANGUAGE_NAMES[new_lang])}\n\n"
-            f"{get_text(new_lang, 'menu_hint')}"
-        )
-        
-        bot.edit_message_text(
-            welcome_text, 
-            call.message.chat.id, 
-            call.message.message_id, 
-            reply_markup=create_main_menu(new_lang)
-        )
-    elif call.data == 'show_profile':
-        profile_stats = get_text(lang_code, 'profile_stats').format(
-            profile.data['id'],
-            profile.get_registration_key(),
-            len(profile.data.get('history', [])),
-            MODEL_DISPLAY_NAMES[profile.data['settings'].get('model', 'gpt-4')],
-            LANGUAGE_NAMES[lang_code]
-        )
-        
-        bot.edit_message_text(
-            profile_stats, 
-            call.message.chat.id, 
-            call.message.message_id, 
-            reply_markup=create_main_menu(lang_code)
-        )
-    elif call.data == 'regenerate_response':
-        try:
-            new_answer = get_ai_response(
-                profile.data['last_message'],
-                profile,
-                profile.data['settings'].get('model', 'gpt-4'),
-                lang_code
-            )
-            bot.edit_message_text(
-                new_answer,
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=types.InlineKeyboardMarkup().row(
-                    types.InlineKeyboardButton(get_text(lang_code, 'btn_regenerate'), callback_data='regenerate_response'),
-                    types.InlineKeyboardButton(get_text(lang_code, 'btn_modify'), callback_data='modify_response')
-                )
-            )
-        except Exception as e:
-            bot.answer_callback_query(call.id, f"Ошибка: {str(e)}")
-    elif call.data == 'modify_response':
-        bot.edit_message_text(
-            get_text(lang_code, 'btn_modify'), 
-            call.message.chat.id, 
-            call.message.message_id, 
-            reply_markup=create_modify_response_menu(lang_code)
-        )
-    elif call.data.startswith('modify_'):
-        instruction_map = {
-            'modify_shorter': get_text(lang_code, 'modify_shorter'),
-            'modify_longer': get_text(lang_code, 'modify_longer'),
-            'modify_simpler': get_text(lang_code, 'modify_simpler'),
-            'modify_complex': get_text(lang_code, 'modify_complex')
-        }
-        
-        instruction = instruction_map.get(call.data, '')
-        
-        try:
-            modified_answer = get_ai_response(
-                f"{instruction}\n\nOriginal text:\n{call.message.text}",
-                profile,
-                profile.data['settings'].get('model', 'gpt-4'),
-                lang_code
-            )
-            bot.edit_message_text(
-                modified_answer,
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=types.InlineKeyboardMarkup().row(
-                    types.InlineKeyboardButton(get_text(lang_code, 'btn_regenerate'), callback_data='regenerate_response'),
-                    types.InlineKeyboardButton(get_text(lang_code, 'btn_modify'), callback_data='modify_response')
-                )
-            )
-        except Exception as e:
-            bot.answer_callback_query(call.id, f"Ошибка: {str(e)}")
-
-bot.message_handler(commands=['start'])(handle_start)
-bot.message_handler(func=lambda message: True)(handle_message)
-bot.callback_query_handler(func=lambda call: True)(handle_callback)
-
-bot.polling(none_stop=True)
+if __name__ == '__main__':
+    main()

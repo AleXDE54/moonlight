@@ -12,7 +12,7 @@ class UserProfile:
         self.user_id = user_id
         self.data = {
             'settings': {
-                'language': None,
+                'language': 'en',  # Язык по умолчанию - английский
                 'model': 'gpt-4'
             },
             'messages_count': 0,
@@ -31,7 +31,7 @@ class UserProfile:
         random_digits = ''.join(random.choices(string.digits, k=6))
         key = f"moon-{timestamp}-{random_digits}"
         self.data['registration_key'] = key
-        self.save_profile()
+        self.save()
         return key
 
     def get_registration_key(self) -> str:
@@ -44,6 +44,10 @@ class UserProfile:
             try:
                 with open(self.profile_path, 'r', encoding='utf-8') as f:
                     saved_data = json.load(f)
+                    
+                    # Удаляем 'id', если он есть
+                    saved_data.pop('id', None)
+                    
                     if 'settings' not in saved_data:
                         saved_data['settings'] = {}
                     if 'is_registered' not in saved_data:
@@ -66,30 +70,34 @@ class UserProfile:
             except Exception as e:
                 print(f"Error loading profile: {e}")
 
-    def save_profile(self) -> None:
+    def save(self):
         """Сохранение профиля пользователя в файл"""
         try:
+            # Создаем директорию, если она не существует
+            self.profiles_dir.mkdir(exist_ok=True)
+            
+            # Сохраняем данные в JSON-файл
             with open(self.profile_path, 'w', encoding='utf-8') as f:
-                json.dump(self.data, f, ensure_ascii=False, indent=2)
+                json.dump(self.data, f, ensure_ascii=False, indent=4)
         except Exception as e:
-            print(f"Error saving profile: {e}")
+            print(f"Ошибка сохранения профиля: {e}")
 
     def increment_messages(self) -> None:
         """Увеличение счетчика сообщений"""
         self.data['messages_count'] += 1
-        self.save_profile()
+        self.save()
 
     def set_favorite_model(self, model: str) -> None:
         """Установка предпочитаемой модели"""
         self.data['settings']['model'] = model  
-        self.save_profile()
+        self.save()
 
     def update_settings(self, settings: Dict) -> None:
         """Обновление настроек пользователя"""
         if 'settings' not in self.data:
             self.data['settings'] = {}
         self.data['settings'].update(settings)
-        self.save_profile()
+        self.save()
 
     def is_registered(self):
         """Проверяет, установлен ли язык в профиле"""
@@ -102,19 +110,18 @@ class UserProfile:
     def set_language(self, language):
         """Устанавливает язык в профиле"""
         self.data['settings']['language'] = language
-        self.save_profile()
+        self.save()
 
     def complete_registration(self, language: str) -> None:
         """Завершение регистрации пользователя"""
         self.data['is_registered'] = True
         self.data['settings']['language'] = language
-        self.save_profile()
+        self.save()
 
     def get_stats(self) -> str:
         """Получение статистики пользователя"""
         return (
             f"📊 Статистика профиля:\n"
-            f"└ ID: {self.user_id}\n"
             f"└ Ключ: {self.data.get('registration_key', 'Не назначен')}\n"
             f"└ Отправлено сообщений: {self.data['messages_count']}\n"
             f"└ Модель: {self.data['settings'].get('model', 'не выбрана')}\n"
@@ -132,18 +139,83 @@ class UserProfile:
         # Ограничиваем историю последними 10 сообщениями
         if len(self.data['history']) > 10:
             self.data['history'] = self.data['history'][-10:]
-        self.save_profile()
+        self.save()
 
     def get_history(self):
         """Возвращает историю сообщений"""
         return self.data.get('history', [])
 
+    def initial_setup(self, language=None, model=None):
+        """
+        Первоначальная настройка профиля пользователя
+        
+        :param language: Язык интерфейса (по умолчанию 'en')
+        :param model: Модель AI (по умолчанию 'gpt-4')
+        """
+        # Проверяем, что язык корректный
+        if language and language in ['ru', 'en', 'es', 'de', 'fr']:
+            self.data['settings']['language'] = language
+        
+        # Устанавливаем модель
+        from bot import AVAILABLE_MODELS
+        if model and model in AVAILABLE_MODELS:
+            self.data['settings']['model'] = model
+        else:
+            self.data['settings']['model'] = 'gpt-4'
+        
+        # Помечаем профиль как зарегистрированный
+        self.data['is_registered'] = True
+        
+        # Генерируем регистрационный ключ, если его нет
+        if not self.data.get('registration_key'):
+            self.data['registration_key'] = f'MLA-{self.user_id}'
+        
+        # Сохраняем изменения
+        self.save()
+        
+        return self.data
+
+    def save_profile(self):
+        """Алиас для метода save() для совместимости"""
+        self.save()
+
 class ProfileManager:
     _instances = {}
 
-    @classmethod
-    def get_profile(cls, user_id: str) -> UserProfile:  
-        """Получение профиля пользователя (синглтон)"""
-        if user_id not in cls._instances:
-            cls._instances[user_id] = UserProfile(user_id)
-        return cls._instances[user_id]
+    def __init__(self, user_id: str):
+        if user_id not in self._instances:
+            self._instances[user_id] = UserProfile(user_id)
+        self.data = self._instances[user_id].data
+        self.profile = self._instances[user_id]
+
+    def add_to_history(self, message, response):
+        """Добавление сообщения в историю"""
+        self.data['history'].append({
+            'message': message,
+            'response': response,
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+        # Ограничиваем историю последними 50 сообщениями
+        self.data['history'] = self.data['history'][-50:]
+        self.profile.save()
+
+    def save_profile(self):
+        """Алиас для метода save() для совместимости"""
+        self.profile.save()
+
+    def save(self):
+        """Алиас для save() для совместимости"""
+        self.profile.save()
+
+    def get_registration_key(self):
+        """Получение регистрационного ключа"""
+        return self.data.get('registration_key', '')
+
+    def initial_setup(self, language=None, model=None):
+        """
+        Первоначальная настройка профиля пользователя
+        
+        :param language: Язык интерфейса (по умолчанию 'en')
+        :param model: Модель AI (по умолчанию 'gpt-4')
+        """
+        return self.profile.initial_setup(language, model)

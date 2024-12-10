@@ -1,6 +1,6 @@
 TRANSLATIONS = {
     'ru': {
-        'welcome': "👋 Привет! Я ваш AI-ассистент.",
+        'welcome': "👋 Привет! Я moonlight",
         'registration_key': "🔑 Ваш регистрационный ключ: {}",
         'select_language': "Выберите язык:",
         'current_model': "🤖 Текущая модель: {}",
@@ -12,12 +12,11 @@ TRANSLATIONS = {
         'select_model': "Выберите модель AI:",
         'model_changed': "✅ Модель изменена на {}",
         'language_changed': "✅ Язык изменен на {}",
-        'profile_stats': """👤 Профиль:
-🆔 ID: {}
-🔑 Ключ: {}
-📊 Сообщений: {}
-🤖 Модель: {}
-🌍 Язык: {}""",
+        'profile_stats': """📊 Статистика профиля:
+└ Ключ: {}
+└ Отправлено сообщений: {}
+└ Модель: {}
+└ Язык: {}""",
         'error': "❌ Произошла ошибка: {}",
         'thinking': "⏳ Думаю...",
         'btn_regenerate': "🔄 Перегенерировать",
@@ -31,10 +30,18 @@ TRANSLATIONS = {
         'modify_shorter': "Сделай ответ короче и лаконичнее",
         'modify_longer': "Предоставь более подробный и развернутый ответ",
         'modify_simpler': "Объясни простыми словами, как для начинающего",
-        'modify_complex': "Предоставь более техническое и детальное объяснение"
+        'modify_complex': "Предоставь более техническое и детальное объяснение",
+        'btn_back': "🔙 Назад",
+        'bot_description': """🤖 moonlight - ваш персональный AI-ассистент:
+• Поддержка нескольких языков
+• Несколько моделей AI
+• Настройка под ваши потребности
+• Защита конфиденциальности
+
+Выберите язык для продолжения.""",
     },
     'en': {
-        'welcome': "👋 Hello! I'm your AI assistant.",
+        'welcome': "👋 Hello! I'm moonlight.",
         'registration_key': "🔑 Your registration key: {}",
         'select_language': "🌍 Please select your language:",
         'current_model': "🤖 Current model: {}",
@@ -46,7 +53,11 @@ TRANSLATIONS = {
         'select_model': "Choose AI model:",
         'model_changed': "✅ Model changed to {}",
         'language_changed': "✅ Language changed to {}",
-        'profile_stats': "📊 Profile Statistics:\n└ ID: {}\n└ Key: {}\n└ Messages sent: {}\n└ Model: {}\n└ Language: {}",
+        'profile_stats': """📊 Profile Statistics:
+└ Key: {}
+└ Messages sent: {}
+└ Model: {}
+└ Language: {}""",
         'error': "❌ Error occurred: {}",
         'thinking': "⏳ Thinking...",
         'btn_regenerate': "🔄 Regenerate",
@@ -60,10 +71,18 @@ TRANSLATIONS = {
         'modify_shorter': "Make the answer shorter and more concise",
         'modify_longer': "Provide a more detailed and comprehensive answer",
         'modify_simpler': "Explain in simpler terms, as if to a beginner",
-        'modify_complex': "Provide a more technical and detailed explanation"
+        'modify_complex': "Provide a more technical and detailed explanation",
+        'btn_back': "🔙 Back",
+        'bot_description': """🤖 moonlight - your personal AI assistant:
+• Multi-language support
+• Multiple AI models
+• Customizable experience
+• Privacy protection
+
+Choose a language to continue.""",
     },
     'es': {
-        'welcome': "👋 ¡Hola! Soy tu asistente de IA.",
+        'welcome': "👋 ¡Hola! Soy moonlight.",
         'registration_key': "🔑 Tu clave de registro: {}",
         'select_language': "🌍 Por favor, selecciona tu idioma:",
         'current_model': "🤖 Modelo actual: {}",
@@ -75,7 +94,11 @@ TRANSLATIONS = {
         'select_model': "Elige el modelo de IA:",
         'model_changed': "✅ Modelo cambiado a {}",
         'language_changed': "✅ Idioma cambiado a {}",
-        'profile_stats': "📊 Estadísticas del perfil:\n└ ID: {}\n└ Clave: {}\n└ Mensajes enviados: {}\n└ Modelo: {}\n└ Idioma: {}",
+        'profile_stats': """📊 Estadísticas del perfil:
+└ Clave: {}
+└ Mensajes enviados: {}
+└ Modelo: {}
+└ Idioma: {}""",
         'error': "❌ Error: {}",
         'thinking': "⏳ Pensando...",
         'btn_regenerate': "🔄 Regenerar",
@@ -89,10 +112,18 @@ TRANSLATIONS = {
         'modify_shorter': "Haz la respuesta más corta y concisa",
         'modify_longer': "Proporciona una respuesta más detallada y completa",
         'modify_simpler': "Explica en términos más simples, como para un principiante",
-        'modify_complex': "Proporciona una explicación más técnica y detallada"
+        'modify_complex': "Proporciona una explicación más técnica y detallada",
+        'btn_back': "🔙 Atrás",
+        'bot_description': """🤖 moonlight - tu asistente de IA personal:
+• Soporte multilingüe
+• Múltiples modelos de IA
+• Experiencia personalizable
+• Protección de privacidad
+
+Elige un idioma para continuar.""",
     },
     'de': {
-        'welcome': "👋 Hallo! Ich bin dein KI-Assistent.",
+        'welcome': "👋 Hallo! Ich bin moonlight.",
         'registration_key': "🔑 Dein Registrierungsschlüssel: {}",
         'select_language': "🌍 Bitte wähle deine Sprache:",
         'current_model': "🤖 Aktuelles Modell: {}",
@@ -104,7 +135,12 @@ TRANSLATIONS = {
         'select_model': "Wähle das KI-Modell:",
         'model_changed': "✅ Modell geändert zu {}",
         'language_changed': "✅ Sprache geändert zu {}",
-        'profile_stats': "📊 Profilstatistik:\n└ ID: {}\n└ Schlüssel: {}\n└ Gesendete Nachrichten: {}\n└ Modell: {}\n└ Sprache: {}",
+        'profile_stats': """📊 Profilstatistik:
+└ ID: {}
+└ Schlüssel: {}
+└ Gesendete Nachrichten: {}
+└ Modell: {}
+└ Sprache: {}""",
         'error': "❌ Fehler aufgetreten: {}",
         'thinking': "⏳ Denke nach...",
         'btn_regenerate': "🔄 Neu generieren",
@@ -118,10 +154,18 @@ TRANSLATIONS = {
         'modify_shorter': "Mache die Antwort kürzer und prägnanter",
         'modify_longer': "Gib eine ausführlichere und umfassendere Antwort",
         'modify_simpler': "Erkläre in einfacheren Worten, wie für einen Anfänger",
-        'modify_complex': "Gib eine technischere und detailliertere Erklärung"
+        'modify_complex': "Gib eine technischere und detailliertere Erklärung",
+        'btn_back': "🔙 Zurück",
+        'bot_description': """🤖 moonlight - dein persönlicher KI-Assistent:
+• Mehrsprachige Unterstützung
+• Mehrere KI-Modelle
+• Anpassbare Erfahrung
+• Datenschutz
+
+Wähle eine Sprache, um fortzufahren.""",
     },
     'fr': {
-        'welcome': "👋 Bonjour! Je suis votre assistant IA.",
+        'welcome': "👋 Bonjour! Je suis moonlight.",
         'registration_key': "🔑 Votre clé d'inscription: {}",
         'select_language': "🌍 Veuillez choisir votre langue:",
         'current_model': "🤖 Modèle actuel: {}",
@@ -133,7 +177,12 @@ TRANSLATIONS = {
         'select_model': "Choisissez le modèle IA:",
         'model_changed': "✅ Modèle changé pour {}",
         'language_changed': "✅ Langue changée pour {}",
-        'profile_stats': "📊 Statistiques du profil:\n└ ID: {}\n└ Clé: {}\n└ Messages envoyés: {}\n└ Modèle: {}\n└ Langue: {}",
+        'profile_stats': """📊 Statistiques du profil:
+└ ID: {}
+└ Clé: {}
+└ Messages envoyés: {}
+└ Modèle: {}
+└ Langue: {}""",
         'error': "❌ Erreur survenue: {}",
         'thinking': "⏳ Réflexion...",
         'btn_regenerate': "🔄 Régénérer",
@@ -147,17 +196,25 @@ TRANSLATIONS = {
         'modify_shorter': "Rends la réponse plus courte et concise",
         'modify_longer': "Fournis une réponse plus détaillée et complète",
         'modify_simpler': "Explique en termes plus simples, comme pour un débutant",
-        'modify_complex': "Fournis une explication plus technique et détaillée"
+        'modify_complex': "Fournis une explication plus technique et détaillée",
+        'btn_back': "🔙 Retour",
+        'bot_description': """🤖 moonlight - votre assistant IA personnel :
+• Support multilingue
+• Plusieurs modèles d'IA
+• Expérience personnalisable
+• Protection de la confidentialité
+
+Choisissez une langue pour continuer.""",
     }
 }
 
 # Словарь с названиями языков
 LANGUAGE_NAMES = {
-    'ru': '🇷🇺 Русский',
-    'en': '🇺🇸 English',
-    'es': '🇪🇸 Español',
-    'de': '🇩🇪 Deutsch',
-    'fr': '🇫🇷 Français'
+    'ru': 'Русский',
+    'en': 'English',
+    'es': 'Español',
+    'de': 'Deutsch',
+    'fr': 'Français'
 }
 
 def get_text(lang_code: str, key: str, *args) -> str:
