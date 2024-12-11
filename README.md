@@ -24,7 +24,7 @@ A powerful Telegram bot with an advanced web management panel, featuring real-ti
 
 ```bash
 git clone https://github.com/AleXDE54/moonlight
-cd g4f_telegram_aibot
+cd moonlight
 ```
 
 2. Create a virtual environment (optional but recommended)
